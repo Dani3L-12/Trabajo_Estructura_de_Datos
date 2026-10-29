@@ -150,8 +150,183 @@ void mostrarHistorial(NodoPila* cima) {
     cout << "\n=== HISTORIAL DE ACCIONES (CIMA -> BASE) ===\n";
     NodoPila* temp = cima;
     while (temp != NULL) {
-        cout << "- " << temp->dato << "\n";
+        cout << "- " << temp->dato << "\n"; 
         temp = temp->siguiente;
     }
 }
+
+// 4. LISTA ENLAZADA: CATALOGO DE VIDEOJUEGOS
+// Muestra los datos de un videojuego en una linea
+void imprimirVideojuego(const Videojuego& juego) {
+    cout << "Codigo: " << juego.codigo
+         << " | Nombre: " << juego.nombre
+         << " | Genero: " << juego.genero
+         << " | Precio: S/. " << fixed << setprecision(2) << juego.precio << "\n";
+}
+
+// Auxiliar: devuelve el nodo con ese codigo, o NULL si no existe
+Nodo* buscarPorCodigo(Nodo* inicio, int codigo) {
+    Nodo* temp = inicio;
+    while (temp != NULL) {
+        if (temp->dato.codigo == codigo) {
+            return temp;
+        }
+        temp = temp->siguiente;
+    }
+    return NULL;
+}
+
+// Insertar al final. Devuelve true si se registro.
+bool insertarVideojuego(Nodo*& inicio, int codigo, string nombre, string genero, float precio) {
+    if (codigo <= 0) {
+        cout << "Codigo invalido\n";
+        return false;
+    }
+    if (precio < 0) {
+        cout << "Precio invalido\n";
+        return false;
+    }
+    if (nombre.empty() || genero.empty()) {
+        cout << "Datos invalidos\n";
+        return false;
+    }
+    if (buscarPorCodigo(inicio, codigo) != NULL) {
+        cout << "Codigo duplicado\n";
+        return false;
+    }
+
+    Videojuego juego;
+    juego.codigo = codigo;
+    juego.nombre = nombre;
+    juego.genero = genero;
+    juego.precio = precio;
+    Nodo* nuevo = new Nodo(juego);
+
+    if (inicio == NULL) {
+        inicio = nuevo;
+    } else {
+        Nodo* temp = inicio;
+        while (temp->siguiente != NULL) {
+            temp = temp->siguiente;
+        }
+        temp->siguiente = nuevo;
+    }
+
+    cout << "Videojuego registrado\n";
+    return true;
+}
+
+// Mostrar todo el catalogo
+void mostrarVideojuegos(Nodo* inicio) {
+    if (inicio == NULL) {
+        cout << "\nEl catalogo de videojuegos esta vacio.\n";
+        return;
+    }
+    cout << "\n================ CATALOGO DE VIDEOJUEGOS ================\n";
+    Nodo* temp = inicio;
+    while (temp != NULL) {
+        imprimirVideojuego(temp->dato);
+        temp = temp->siguiente;
+    }
+}
+
+// Buscar por criterio ("codigo" o "nombre")
+void buscarVideojuego(Nodo* inicio, string criterio, string valor) {
+    if (inicio == NULL) {
+        cout << "La lista esta vacia\n";
+        return;
+    }
+
+    bool encontrado = false;
+    Nodo* temp = inicio;
+
+    while (temp != NULL && !encontrado) {
+        if ((criterio == "codigo" && aTexto(temp->dato.codigo) == valor) ||
+            (criterio == "nombre" && temp->dato.nombre == valor)) {
+            encontrado = true;
+        } else {
+            temp = temp->siguiente;
+        }
+    }
+
+    if (encontrado) {
+        cout << "Videojuego encontrado:\n";
+        imprimirVideojuego(temp->dato);
+    } else {
+        cout << "Videojuego no encontrado\n";
+    }
+}
+
+// Actualizar nombre, genero y precio. Devuelve true si se modifico.
+bool actualizarVideojuego(Nodo* inicio, int codigo) {
+    if (inicio == NULL) {
+        cout << "La lista esta vacia\n";
+        return false;
+    }
+
+    Nodo* temp = inicio;
+    while (temp != NULL && temp->dato.codigo != codigo) {
+        temp = temp->siguiente;
+    }
+
+    if (temp == NULL) {
+        cout << "Videojuego no encontrado\n";
+        return false;
+    }
+
+    string nuevoNombre = leerLinea("Nuevo nombre: ");
+    string nuevoGenero = leerLinea("Nuevo genero: ");
+    float nuevoPrecio = 0;
+    bool precioValido = leerDecimal("Nuevo precio: ", nuevoPrecio);
+
+    if (nuevoNombre.empty() || nuevoGenero.empty() || !precioValido || nuevoPrecio < 0) {
+        cout << "Datos invalidos. No se realizaron cambios\n";
+        return false;
+    }
+
+    temp->dato.nombre = nuevoNombre;
+    temp->dato.genero = nuevoGenero;
+    temp->dato.precio = nuevoPrecio;
+    cout << "Videojuego actualizado\n";
+    return true;
+}
+
+// Eliminar por codigo. Devuelve true si se elimino.
+bool eliminarVideojuego(Nodo*& inicio, int codigo) {
+    if (inicio == NULL) {
+        cout << "La lista esta vacia\n";
+        return false;
+    }
+
+    // Caso especial: eliminar la cabeza
+    if (inicio->dato.codigo == codigo) {
+        Nodo* aux = inicio;
+        inicio = inicio->siguiente;
+        delete aux;
+        cout << "Videojuego eliminado\n";
+        return true;
+    }
+
+    Nodo* anterior = inicio;
+    Nodo* actual = inicio->siguiente;
+
+    while (actual != NULL && actual->dato.codigo != codigo) {
+        anterior = actual;
+        actual = actual->siguiente;
+    }
+
+    if (actual == NULL) {
+        cout << "Videojuego no encontrado\n";
+        return false;
+    }
+
+    anterior->siguiente = actual->siguiente;
+    delete actual;
+    cout << "Videojuego eliminado\n";
+    return true;
+}
+
+
+
+
 
