@@ -326,7 +326,114 @@ bool eliminarVideojuego(Nodo*& inicio, int codigo) {
     return true;
 }
 
+// ==========================================================
+// 5. COLA: SOLICITUDES DE COMPRA (FIFO)
+//    Se controla con dos punteros: frente (sale) y final (entra)
+// ==========================================================
 
+// Enqueue: inserta una solicitud por el final de la cola.
+// Valida que el usuario no este vacio y que codigoJuego > 0.
+// Devuelve true si se registro.
+bool insertarPorElFinal(NodoCola*& frente, NodoCola*& final, string usuario, int codigoJuego) {
+    if (usuario.empty() || codigoJuego <= 0) {
+        cout << "Solicitud incompleta\n";
+        return false;
+    }
+
+    Solicitud solicitud;
+    solicitud.usuario = usuario;
+    solicitud.codigoJuego = codigoJuego;
+
+    NodoCola* nuevo = new NodoCola(solicitud);
+
+    // Si la cola esta vacia, el nuevo nodo es frente y final a la vez
+    if (frente == NULL) {
+        frente = nuevo;
+        final = nuevo;
+    } else {
+        final->siguiente = nuevo;
+        final = nuevo;
+    }
+
+    cout << "Solicitud registrada\n";
+    return true;
+}
+
+// Dequeue: atiende y procesa la solicitud mas antigua (la del frente)
+void eliminarPorElFrente(NodoCola*& frente, NodoCola*& final) {
+    if (frente == NULL) {
+        cout << "La cola esta vacia\n";
+        return;
+    }
+
+    NodoCola* aux = frente;
+    Solicitud solicitud = aux->dato;
+
+    frente = frente->siguiente;
+
+    // Si ya no quedan solicitudes, final tambien debe quedar en NULL
+    if (frente == NULL) {
+        final = NULL;
+    }
+
+    delete aux;
+
+    cout << "Solicitud procesada: " << solicitud.usuario
+         << " - " << solicitud.codigoJuego << "\n";
+}
+
+// Muestra las solicitudes pendientes, desde la mas antigua
+void consultarSolicitudes(NodoCola* frente) {
+    if (frente == NULL) {
+        cout << "La cola esta vacia\n";
+        return;
+    }
+
+    cout << "\n--- SOLICITUDES PENDIENTES ---\n";
+    int posicion = 1;
+    NodoCola* temp = frente;
+
+    while (temp != NULL) {
+        cout << posicion << ". Usuario: " << temp->dato.usuario
+             << " | Codigo del juego: " << temp->dato.codigoJuego << "\n";
+        temp = temp->siguiente;
+        posicion++;
+    }
+}
+
+// ==========================================================
+// 6. LIBERACION DE MEMORIA DINAMICA
+//    Se llaman al salir del programa: cada nodo creado con
+//    new se elimina con delete para evitar fugas de memoria.
+// ==========================================================
+
+// Libera todos los nodos del catalogo
+void liberarCatalogo(Nodo*& inicio) {
+    while (inicio != NULL) {
+        Nodo* aux = inicio;
+        inicio = inicio->siguiente;
+        delete aux;
+    }
+}
+
+// Libera todos los nodos del historial
+void liberarPila(NodoPila*& cima) {
+    while (cima != NULL) {
+        NodoPila* aux = cima;
+        cima = cima->siguiente;
+        delete aux;
+    }
+}
+
+// Libera todos los nodos de la cola y deja frente y final en NULL
+void liberarCola(NodoCola*& frente, NodoCola*& final) {
+    while (frente != NULL) {
+        NodoCola* aux = frente;
+        frente = frente->siguiente;
+        delete aux;
+    }
+    final = NULL;
+}
 
 
 
