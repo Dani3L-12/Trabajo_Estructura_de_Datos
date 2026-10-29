@@ -435,5 +435,228 @@ void liberarCola(NodoCola*& frente, NodoCola*& final) {
     final = NULL;
 }
 
+// ==========================================================
+// 7. OPCIONES DEL MENU
+//    Cada opcion pide los datos, llama a las funciones de las
+//    partes anteriores y registra la accion en el historial.
+// ==========================================================
+
+// ---------- Opciones del catalogo ----------
+
+void opcionRegistrarVideojuego(Nodo*& inicio, NodoPila*& cima) {
+    int codigo;
+    float precio;
+
+    if (!leerEntero("Codigo: ", codigo)) {
+        cout << "Codigo invalido\n";
+        return;
+    }
+    string nombre = leerLinea("Nombre: ");
+    string genero = leerLinea("Genero: ");
+    if (!leerDecimal("Precio: ", precio)) {
+        cout << "Precio invalido\n";
+        return;
+    }
+
+    if (insertarVideojuego(inicio, codigo, nombre, genero, precio)) {
+        insertarEnCima(cima, "Registro del videojuego " + aTexto(codigo) + " (" + nombre + ")");
+    }
+}
+
+void opcionBuscarVideojuego(Nodo* inicio) {
+    cout << "Buscar por:\n";
+    cout << "1. Codigo\n";
+    cout << "2. Nombre\n";
+
+    int opcion;
+    if (!leerEntero("Seleccione una opcion: ", opcion)) {
+        cout << "Opcion invalida\n";
+        return;
+    }
+
+    if (opcion == 1) {
+        int codigo;
+        if (!leerEntero("Codigo a buscar: ", codigo)) {
+            cout << "Codigo invalido\n";
+            return;
+        }
+        buscarVideojuego(inicio, "codigo", aTexto(codigo));
+    } else if (opcion == 2) {
+        string nombre = leerLinea("Nombre a buscar: ");
+        buscarVideojuego(inicio, "nombre", nombre);
+    } else {
+        cout << "Opcion invalida\n";
+    }
+}
+
+void opcionActualizarVideojuego(Nodo* inicio, NodoPila*& cima) {
+    int codigo;
+    if (!leerEntero("Codigo del videojuego a actualizar: ", codigo)) {
+        cout << "Codigo invalido\n";
+        return;
+    }
+    if (actualizarVideojuego(inicio, codigo)) {
+        insertarEnCima(cima, "Actualizacion del videojuego " + aTexto(codigo));
+    }
+}
+
+void opcionEliminarVideojuego(Nodo*& inicio, NodoPila*& cima) {
+    int codigo;
+    if (!leerEntero("Codigo del videojuego a eliminar: ", codigo)) {
+        cout << "Codigo invalido\n";
+        return;
+    }
+    if (eliminarVideojuego(inicio, codigo)) {
+        insertarEnCima(cima, "Eliminacion del videojuego " + aTexto(codigo));
+    }
+}
+
+// ---------- Opciones de solicitudes de compra ----------
+
+void opcionRegistrarSolicitud(Nodo* catalogo, NodoCola*& frente, NodoCola*& final, NodoPila*& cima) {
+    string usuario = leerLinea("Nombre del usuario: ");
+    int codigoJuego;
+
+    if (!leerEntero("Codigo del juego a comprar: ", codigoJuego)) {
+        cout << "Codigo invalido\n";
+        return;
+    }
+    if (buscarPorCodigo(catalogo, codigoJuego) == NULL) {
+        cout << "El videojuego no existe en el catalogo\n";
+        return;
+    }
+
+    if (insertarPorElFinal(frente, final, usuario, codigoJuego)) {
+        insertarEnCima(cima, "Solicitud registrada: " + usuario + " - juego " + aTexto(codigoJuego));
+    }
+}
+
+void opcionProcesarSolicitud(NodoCola*& frente, NodoCola*& final, NodoPila*& cima) {
+    if (frente == NULL) {
+        cout << "La cola esta vacia\n";
+        return;
+    }
+
+    // Se guardan los datos antes de que el nodo sea eliminado
+    string usuario = frente->dato.usuario;
+    int codigoJuego = frente->dato.codigoJuego;
+
+    eliminarPorElFrente(frente, final);
+    insertarEnCima(cima, "Solicitud procesada: " + usuario + " - juego " + aTexto(codigoJuego));
+}
+
+// ---------- Submenus ----------
+
+void menuCatalogo(Nodo*& catalogo, NodoPila*& historial) {
+    int opcion;
+    do {
+        cout << "\n----- CATALOGO DE VIDEOJUEGOS -----\n";
+        cout << "1. Registrar videojuego\n";
+        cout << "2. Mostrar catalogo\n";
+        cout << "3. Buscar videojuego\n";
+        cout << "4. Actualizar videojuego\n";
+        cout << "5. Eliminar videojuego\n";
+        cout << "0. Volver al menu principal\n";
+
+        if (!leerEntero("Seleccione una opcion: ", opcion)) {
+            opcion = -1;
+        }
+
+        switch (opcion) {
+            case 1: opcionRegistrarVideojuego(catalogo, historial); break;
+            case 2: mostrarVideojuegos(catalogo); break;
+            case 3: opcionBuscarVideojuego(catalogo); break;
+            case 4: opcionActualizarVideojuego(catalogo, historial); break;
+            case 5: opcionEliminarVideojuego(catalogo, historial); break;
+            case 0: break;
+            default: cout << "Opcion invalida\n";
+        }
+    } while (opcion != 0);
+}
+
+void menuSolicitudes(Nodo* catalogo, NodoCola*& frente, NodoCola*& final, NodoPila*& historial) {
+    int opcion;
+    do {
+        cout << "\n----- SOLICITUDES DE COMPRA -----\n";
+        cout << "1. Registrar solicitud\n";
+        cout << "2. Procesar siguiente solicitud\n";
+        cout << "3. Consultar solicitudes pendientes\n";
+        cout << "0. Volver al menu principal\n";
+
+        if (!leerEntero("Seleccione una opcion: ", opcion)) {
+            opcion = -1;
+        }
+
+        switch (opcion) {
+            case 1: opcionRegistrarSolicitud(catalogo, frente, final, historial); break;
+            case 2: opcionProcesarSolicitud(frente, final, historial); break;
+            case 3: consultarSolicitudes(frente); break;
+            case 0: break;
+            default: cout << "Opcion invalida\n";
+        }
+    } while (opcion != 0);
+}
+
+void menuHistorial(NodoPila*& historial) {
+    int opcion;
+    do {
+        cout << "\n----- HISTORIAL DE ACCIONES -----\n";
+        cout << "1. Mostrar historial\n";
+        cout << "2. Retirar la ultima accion\n";
+        cout << "0. Volver al menu principal\n";
+
+        if (!leerEntero("Seleccione una opcion: ", opcion)) {
+            opcion = -1;
+        }
+
+        switch (opcion) {
+            case 1: mostrarHistorial(historial); break;
+            case 2: eliminarDeCima(historial); break;
+            case 0: break;
+            default: cout << "Opcion invalida\n";
+        }
+    } while (opcion != 0);
+}
+
+// ==========================================================
+// 8. FUNCION PRINCIPAL
+// ==========================================================
+
+int main() {
+    Nodo* catalogo = NULL;       // Lista enlazada
+    NodoCola* frente = NULL;     // Cola: frente
+    NodoCola* final = NULL;      // Cola: final
+    NodoPila* historial = NULL;  // Pila: cima
+
+    int opcion;
+    do {
+        cout << "\n==========================================\n";
+        cout << "   TIENDA DIGITAL DE VIDEOJUEGOS\n";
+        cout << "==========================================\n";
+        cout << "1. Catalogo de videojuegos\n";
+        cout << "2. Solicitudes de compra\n";
+        cout << "3. Historial de acciones\n";
+        cout << "0. Salir\n";
+
+        if (!leerEntero("Seleccione una opcion: ", opcion)) {
+            opcion = -1;
+        }
+
+        switch (opcion) {
+            case 1: menuCatalogo(catalogo, historial); break;
+            case 2: menuSolicitudes(catalogo, frente, final, historial); break;
+            case 3: menuHistorial(historial); break;
+            case 0: cout << "\nSaliendo del sistema...\n"; break;
+            default: cout << "Opcion invalida\n";
+        }
+    } while (opcion != 0);
+
+    // Liberar toda la memoria dinamica antes de terminar
+    liberarCatalogo(catalogo);
+    liberarCola(frente, final);
+    liberarPila(historial);
+
+    return 0;
+}
 
 
