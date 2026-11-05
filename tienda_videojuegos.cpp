@@ -1,27 +1,13 @@
-/*
- * SISTEMA DE GESTION DE TIENDA DIGITAL DE VIDEOJUEGOS
- * Estructura de Datos - Entregable 2
- *
- * Estructuras utilizadas (todas con nodos y punteros):
- *   - Lista enlazada simple : catalogo de videojuegos
- *   - Cola (FIFO)           : solicitudes de compra pendientes
- *   - Pila (LIFO)           : historial de acciones administrativas
- *
- * Compila en C++98 y C++11 (no usa to_string ni nullptr).
- */
+
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <cstdlib>
 
 using namespace std;
 
-// ==========================================================
-// 1. ESTRUCTURAS DE DATOS Y NODOS
-// ==========================================================
-
-// Datos de un videojuego (catalogo)
 struct Videojuego {
     int codigo;
     string nombre;
@@ -120,7 +106,7 @@ bool leerDecimal(const string& mensaje, float& valor) {
 // 3. PILA: HISTORIAL DE ACCIONES (LIFO)
 // ==========================================================
 
-// Push: inserta una accion en la cima
+// Inserta una accion en la cima
 void insertarEnCima(NodoPila*& cima, string accion) {
     NodoPila* nuevo = new NodoPila(accion);
     nuevo->siguiente = cima;
@@ -128,7 +114,7 @@ void insertarEnCima(NodoPila*& cima, string accion) {
     cout << "[Historial] Accion registrada.\n";
 }
 
-// Pop: retira la accion de la cima
+// Retira la accion de la cima
 void eliminarDeCima(NodoPila*& cima) {
     if (cima == NULL) {
         cout << "La pila esta vacia.\n";
@@ -331,7 +317,7 @@ bool eliminarVideojuego(Nodo*& inicio, int codigo) {
 //    Se controla con dos punteros: frente (sale) y final (entra)
 // ==========================================================
 
-// Enqueue: inserta una solicitud por el final de la cola.
+// Inserta una solicitud por el final de la cola.
 // Valida que el usuario no este vacio y que codigoJuego > 0.
 // Devuelve true si se registro.
 bool insertarPorElFinal(NodoCola*& frente, NodoCola*& final, string usuario, int codigoJuego) {
@@ -359,7 +345,7 @@ bool insertarPorElFinal(NodoCola*& frente, NodoCola*& final, string usuario, int
     return true;
 }
 
-// Dequeue: atiende y procesa la solicitud mas antigua (la del frente)
+// Atiende y procesa la solicitud mas antigua (la del frente)
 void eliminarPorElFrente(NodoCola*& frente, NodoCola*& final) {
     if (frente == NULL) {
         cout << "La cola esta vacia\n";
@@ -436,7 +422,279 @@ void liberarCola(NodoCola*& frente, NodoCola*& final) {
 }
 
 // ==========================================================
-// 7. OPCIONES DEL MENU
+// 7. PERSISTENCIA (ARCHIVOS)
+//    Los datos se guardan en archivos de texto en la carpeta
+//    del ejecutable y se recuperan al iniciar el programa.
+//    Formato de cada archivo:
+//      catalogo.txt    : codigo|nombre|genero|precio
+//      solicitudes.txt : usuario|codigoJuego (frente -> final)
+//      historial.txt   : una accion por linea (cima -> base)
+// ==========================================================
+
+// Nombres de los archivos de texto
+const char* ARCHIVO_CATALOGO = "catalogo.txt";
+const char* ARCHIVO_SOLICITUDES = "solicitudes.txt";
+const char* ARCHIVO_HISTORIAL = "historial.txt";
+
+// Convierte texto a entero sin imprimir nada (para la carga)
+bool convertirEntero(const string& texto, int& valor) {
+    istringstream ss(texto);
+    char extra;
+    return (ss >> valor) && !(ss >> extra);
+}
+
+// Convierte texto a decimal sin imprimir nada (para la carga)
+bool convertirDecimal(const string& texto, float& valor) {
+    istringstream ss(texto);
+    char extra;
+    return (ss >> valor) && !(ss >> extra);
+}
+
+// Separa una linea por el caracter '|'. Devuelve false si hay
+// mas campos de los permitidos. "cantidad" recibe cuantos salieron.
+bool separarCampos(const string& linea, string campos[], int maximo, int& cantidad) {
+    cantidad = 0;
+    size_t inicio = 0;
+
+    size_t pos = linea.find('|');
+    while (pos != string::npos) {
+        if (cantidad == maximo) {
+            return false;
+        }
+        campos[cantidad] = recortar(linea.substr(inicio, pos - inicio));
+        cantidad++;
+        inicio = pos + 1;
+        pos = linea.find('|', inicio);
+    }
+
+    if (cantidad == maximo) {
+        return false;
+    }
+    campos[cantidad] = recortar(linea.substr(inicio));
+    cantidad++;
+    return true;
+}
+
+// Auxiliar de carga: enlaza un juego al final de la lista sin imprimir
+void enlazarVideojuego(Nodo*& inicio, const Videojuego& juego) {
+    Nodo* nuevo = new Nodo(juego);
+    if (inicio == NULL) {
+        inicio = nuevo;
+        return;
+    }
+    Nodo* temp = inicio;
+    while (temp->siguiente != NULL) {
+        temp = temp->siguiente;
+    }
+    temp->siguiente = nuevo;
+}
+
+// Auxiliar de carga: enlaza una solicitud al final de la cola sin imprimir
+void enlazarSolicitud(NodoCola*& frente, NodoCola*& final, const Solicitud& solicitud) {
+    NodoCola* nuevo = new NodoCola(solicitud);
+    if (frente == NULL) {
+        frente = nuevo;
+        final = nuevo;
+        return;
+    }
+    final->siguiente = nuevo;
+    final = nuevo;
+}
+
+// Auxiliar de carga: inserta una accion en la cima sin imprimir
+void enlazarAccion(NodoPila*& cima, const string& accion) {
+    NodoPila* nuevo = new NodoPila(accion);
+    nuevo->siguiente = cima;
+    cima = nuevo;
+}
+
+// Guarda el catalogo, un juego por linea
+void guardarCatalogo(Nodo* inicio) {
+    ofstream archivo(ARCHIVO_CATALOGO);
+    if (!archivo.is_open()) {
+        cout << "No se pudo abrir " << ARCHIVO_CATALOGO << " para guardar\n";
+        return;
+    }
+
+    Nodo* temp = inicio;
+    while (temp != NULL) {
+        archivo << temp->dato.codigo << "|"
+                << temp->dato.nombre << "|"
+                << temp->dato.genero << "|"
+                << fixed << setprecision(2) << temp->dato.precio << "\n";
+        temp = temp->siguiente;
+    }
+}
+
+// Guarda las solicitudes, de frente a final
+void guardarSolicitudes(NodoCola* frente) {
+    ofstream archivo(ARCHIVO_SOLICITUDES);
+    if (!archivo.is_open()) {
+        cout << "No se pudo abrir " << ARCHIVO_SOLICITUDES << " para guardar\n";
+        return;
+    }
+
+    NodoCola* temp = frente;
+    while (temp != NULL) {
+        archivo << temp->dato.usuario << "|" << temp->dato.codigoJuego << "\n";
+        temp = temp->siguiente;
+    }
+}
+
+// Guarda el historial, de cima a base
+void guardarHistorial(NodoPila* cima) {
+    ofstream archivo(ARCHIVO_HISTORIAL);
+    if (!archivo.is_open()) {
+        cout << "No se pudo abrir " << ARCHIVO_HISTORIAL << " para guardar\n";
+        return;
+    }
+
+    NodoPila* temp = cima;
+    while (temp != NULL) {
+        archivo << temp->dato << "\n";
+        temp = temp->siguiente;
+    }
+}
+
+// Carga el catalogo al final de la lista. Ignora lineas invalidas
+// y codigos repetidos.
+void cargarCatalogo(Nodo*& inicio, int& cantidadCargada) {
+    cantidadCargada = 0;
+    ifstream archivo(ARCHIVO_CATALOGO);
+    if (!archivo.is_open()) {
+        return;  // Primera ejecucion: el archivo no existe
+    }
+
+    string linea;
+    string campos[4];
+    int cantidad = 0;
+
+    while (getline(archivo, linea)) {
+        linea = recortar(linea);
+        if (linea.empty()) {
+            continue;
+        }
+
+        int codigo;
+        float precio;
+        if (!separarCampos(linea, campos, 4, cantidad) || cantidad != 4) {
+            continue;
+        }
+        if (!convertirEntero(campos[0], codigo) || codigo <= 0) {
+            continue;
+        }
+        if (campos[1].empty() || campos[2].empty()) {
+            continue;
+        }
+        if (!convertirDecimal(campos[3], precio) || precio < 0) {
+            continue;
+        }
+        if (buscarPorCodigo(inicio, codigo) != NULL) {
+            continue;  // Codigo repetido: se ignora
+        }
+
+        Videojuego juego;
+        juego.codigo = codigo;
+        juego.nombre = campos[1];
+        juego.genero = campos[2];
+        juego.precio = precio;
+        enlazarVideojuego(inicio, juego);
+        cantidadCargada++;
+    }
+}
+
+// Carga las solicitudes en el mismo orden del archivo (frente -> final)
+void cargarSolicitudes(NodoCola*& frente, NodoCola*& final, int& cantidadCargada) {
+    cantidadCargada = 0;
+    ifstream archivo(ARCHIVO_SOLICITUDES);
+    if (!archivo.is_open()) {
+        return;
+    }
+
+    string linea;
+    string campos[2];
+    int cantidad = 0;
+
+    while (getline(archivo, linea)) {
+        linea = recortar(linea);
+        if (linea.empty()) {
+            continue;
+        }
+
+        int codigoJuego;
+        if (!separarCampos(linea, campos, 2, cantidad) || cantidad != 2) {
+            continue;
+        }
+        if (campos[0].empty()) {
+            continue;
+        }
+        if (!convertirEntero(campos[1], codigoJuego) || codigoJuego <= 0) {
+            continue;
+        }
+
+        Solicitud solicitud;
+        solicitud.usuario = campos[0];
+        solicitud.codigoJuego = codigoJuego;
+        enlazarSolicitud(frente, final, solicitud);
+        cantidadCargada++;
+    }
+}
+
+// Carga el historial. El archivo va de cima a base, por eso se
+// apila primero en una pila auxiliar y despues se traslada a la
+// pila real: la primera linea del archivo queda en la cima.
+void cargarHistorial(NodoPila*& cima, int& cantidadCargada) {
+    cantidadCargada = 0;
+    ifstream archivo(ARCHIVO_HISTORIAL);
+    if (!archivo.is_open()) {
+        return;
+    }
+
+    NodoPila* auxiliar = NULL;
+    string linea;
+
+    while (getline(archivo, linea)) {
+        linea = recortar(linea);
+        if (linea.empty()) {
+            continue;
+        }
+        enlazarAccion(auxiliar, linea);
+        cantidadCargada++;
+    }
+
+    // En la auxiliar la accion mas antigua quedo en la cima.
+    // Al pasarla a la pila real, la mas reciente queda arriba.
+    while (auxiliar != NULL) {
+        NodoPila* nodo = auxiliar;
+        auxiliar = auxiliar->siguiente;
+        nodo->siguiente = cima;
+        cima = nodo;
+    }
+}
+
+// Agrupadora: guarda las tres estructuras
+void guardarDatos(Nodo* inicio, NodoCola* frente, NodoPila* cima) {
+    guardarCatalogo(inicio);
+    guardarSolicitudes(frente);
+    guardarHistorial(cima);
+}
+
+// Agrupadora: carga las tres estructuras y muestra un solo resumen
+void cargarDatos(Nodo*& inicio, NodoCola*& frente, NodoCola*& final, NodoPila*& cima) {
+    int juegos = 0;
+    int solicitudes = 0;
+    int acciones = 0;
+
+    cargarCatalogo(inicio, juegos);
+    cargarSolicitudes(frente, final, solicitudes);
+    cargarHistorial(cima, acciones);
+
+    cout << "\nDatos cargados: " << juegos << " juegos, "
+         << solicitudes << " solicitudes, " << acciones << " acciones\n";
+}
+
+// ==========================================================
+// 8. OPCIONES DEL MENU
 //    Cada opcion pide los datos, llama a las funciones de las
 //    partes anteriores y registra la accion en el historial.
 // ==========================================================
@@ -619,7 +877,7 @@ void menuHistorial(NodoPila*& historial) {
 }
 
 // ==========================================================
-// 8. FUNCION PRINCIPAL
+// 9. FUNCION PRINCIPAL
 // ==========================================================
 
 int main() {
@@ -627,6 +885,9 @@ int main() {
     NodoCola* frente = NULL;     // Cola: frente
     NodoCola* final = NULL;      // Cola: final
     NodoPila* historial = NULL;  // Pila: cima
+
+    // Recuperar los datos guardados en la ejecucion anterior
+    cargarDatos(catalogo, frente, final, historial);
 
     int opcion;
     do {
@@ -649,6 +910,9 @@ int main() {
             case 0: cout << "\nSaliendo del sistema...\n"; break;
             default: cout << "Opcion invalida\n";
         }
+
+        // Guardar en disco al final de cada vuelta del menu
+        guardarDatos(catalogo, frente, historial);
     } while (opcion != 0);
 
     // Liberar toda la memoria dinamica antes de terminar
@@ -658,5 +922,3 @@ int main() {
 
     return 0;
 }
-
-
