@@ -1,13 +1,22 @@
-
 #include <iostream>
 #include <iomanip>
-#include <fstream>
 #include <sstream>
+#include <fstream>
 #include <string>
 #include <cstdlib>
 
 using namespace std;
 
+// ==========================================================
+// 1. CONSTANTES Y ESTRUCTURAS DE DATOS
+// ==========================================================
+
+const char* ARCHIVO_CATALOGO    = "catalogo.txt";
+const char* ARCHIVO_SOLICITUDES = "solicitudes.txt";
+const char* ARCHIVO_HISTORIAL   = "historial.txt";
+const char  SEPARADOR           = '|';   // separa los campos en los archivos
+
+// Datos de un videojuego (catalogo)
 struct Videojuego {
     int codigo;
     string nombre;
@@ -54,11 +63,7 @@ struct NodoCola {
     }
 };
 
-// ==========================================================
 // 2. FUNCIONES AUXILIARES DE ENTRADA Y TEXTO
-//    Todas las lecturas se hacen con getline: asi nunca queda
-//    basura en el buffer ni se bloquea cin al escribir letras.
-// ==========================================================
 
 // Convierte un entero a texto (reemplaza a to_string)
 string aTexto(int numero) {
@@ -77,6 +82,20 @@ string recortar(const string& texto) {
     return texto.substr(ini, fin - ini + 1);
 }
 
+// Convierte texto a entero. Devuelve false si no es un entero valido.
+bool textoAEntero(const string& texto, int& valor) {
+    istringstream ss(texto);
+    char extra;
+    return (ss >> valor) && !(ss >> extra);
+}
+
+// Convierte texto a decimal. Devuelve false si no es un numero valido.
+bool textoADecimal(const string& texto, float& valor) {
+    istringstream ss(texto);
+    char extra;
+    return (ss >> valor) && !(ss >> extra);
+}
+
 // Lee una linea completa. Si se cierra la entrada, termina el programa.
 string leerLinea(const string& mensaje) {
     string linea;
@@ -88,25 +107,26 @@ string leerLinea(const string& mensaje) {
     return recortar(linea);
 }
 
-// Lee un entero. Devuelve false si lo escrito no es un entero valido.
+// Lee un entero por teclado. Devuelve false si lo escrito no es valido.
 bool leerEntero(const string& mensaje, int& valor) {
-    istringstream ss(leerLinea(mensaje));
-    char extra;
-    return (ss >> valor) && !(ss >> extra);
+    return textoAEntero(leerLinea(mensaje), valor);
 }
 
-// Lee un decimal. Devuelve false si lo escrito no es un numero valido.
+// Lee un decimal por teclado. Devuelve false si lo escrito no es valido.
 bool leerDecimal(const string& mensaje, float& valor) {
-    istringstream ss(leerLinea(mensaje));
-    char extra;
-    return (ss >> valor) && !(ss >> extra);
+    return textoADecimal(leerLinea(mensaje), valor);
+}
+
+// Un texto es valido si no esta vacio y no contiene el separador de archivos
+bool textoValido(const string& texto) {
+    return !texto.empty() && texto.find(SEPARADOR) == string::npos;
 }
 
 // ==========================================================
 // 3. PILA: HISTORIAL DE ACCIONES (LIFO)
 // ==========================================================
 
-// Inserta una accion en la cima
+// Push: inserta una accion en la cima
 void insertarEnCima(NodoPila*& cima, string accion) {
     NodoPila* nuevo = new NodoPila(accion);
     nuevo->siguiente = cima;
@@ -114,7 +134,7 @@ void insertarEnCima(NodoPila*& cima, string accion) {
     cout << "[Historial] Accion registrada.\n";
 }
 
-// Retira la accion de la cima
+// Pop: retira la accion de la cima
 void eliminarDeCima(NodoPila*& cima) {
     if (cima == NULL) {
         cout << "La pila esta vacia.\n";
@@ -136,12 +156,15 @@ void mostrarHistorial(NodoPila* cima) {
     cout << "\n=== HISTORIAL DE ACCIONES (CIMA -> BASE) ===\n";
     NodoPila* temp = cima;
     while (temp != NULL) {
-        cout << "- " << temp->dato << "\n"; 
+        cout << "- " << temp->dato << "\n";
         temp = temp->siguiente;
     }
 }
 
+// ==========================================================
 // 4. LISTA ENLAZADA: CATALOGO DE VIDEOJUEGOS
+// ==========================================================
+
 // Muestra los datos de un videojuego en una linea
 void imprimirVideojuego(const Videojuego& juego) {
     cout << "Codigo: " << juego.codigo
@@ -162,6 +185,21 @@ Nodo* buscarPorCodigo(Nodo* inicio, int codigo) {
     return NULL;
 }
 
+// Auxiliar (sin mensajes): enlaza un videojuego al final de la lista
+void agregarAlFinal(Nodo*& inicio, Videojuego juego) {
+    Nodo* nuevo = new Nodo(juego);
+
+    if (inicio == NULL) {
+        inicio = nuevo;
+    } else {
+        Nodo* temp = inicio;
+        while (temp->siguiente != NULL) {
+            temp = temp->siguiente;
+        }
+        temp->siguiente = nuevo;
+    }
+}
+
 // Insertar al final. Devuelve true si se registro.
 bool insertarVideojuego(Nodo*& inicio, int codigo, string nombre, string genero, float precio) {
     if (codigo <= 0) {
@@ -176,6 +214,10 @@ bool insertarVideojuego(Nodo*& inicio, int codigo, string nombre, string genero,
         cout << "Datos invalidos\n";
         return false;
     }
+    if (!textoValido(nombre) || !textoValido(genero)) {
+        cout << "No se permite el caracter '|' en los textos\n";
+        return false;
+    }
     if (buscarPorCodigo(inicio, codigo) != NULL) {
         cout << "Codigo duplicado\n";
         return false;
@@ -186,17 +228,7 @@ bool insertarVideojuego(Nodo*& inicio, int codigo, string nombre, string genero,
     juego.nombre = nombre;
     juego.genero = genero;
     juego.precio = precio;
-    Nodo* nuevo = new Nodo(juego);
-
-    if (inicio == NULL) {
-        inicio = nuevo;
-    } else {
-        Nodo* temp = inicio;
-        while (temp->siguiente != NULL) {
-            temp = temp->siguiente;
-        }
-        temp->siguiente = nuevo;
-    }
+    agregarAlFinal(inicio, juego);
 
     cout << "Videojuego registrado\n";
     return true;
@@ -265,7 +297,8 @@ bool actualizarVideojuego(Nodo* inicio, int codigo) {
     float nuevoPrecio = 0;
     bool precioValido = leerDecimal("Nuevo precio: ", nuevoPrecio);
 
-    if (nuevoNombre.empty() || nuevoGenero.empty() || !precioValido || nuevoPrecio < 0) {
+    if (!textoValido(nuevoNombre) || !textoValido(nuevoGenero) ||
+        !precioValido || nuevoPrecio < 0) {
         cout << "Datos invalidos. No se realizaron cambios\n";
         return false;
     }
@@ -284,7 +317,7 @@ bool eliminarVideojuego(Nodo*& inicio, int codigo) {
         return false;
     }
 
-    // Caso especial: eliminar la cabeza
+    // Caso especial: eliminar el inicio
     if (inicio->dato.codigo == codigo) {
         Nodo* aux = inicio;
         inicio = inicio->siguiente;
@@ -314,25 +347,12 @@ bool eliminarVideojuego(Nodo*& inicio, int codigo) {
 
 // ==========================================================
 // 5. COLA: SOLICITUDES DE COMPRA (FIFO)
-//    Se controla con dos punteros: frente (sale) y final (entra)
 // ==========================================================
 
-// Inserta una solicitud por el final de la cola.
-// Valida que el usuario no este vacio y que codigoJuego > 0.
-// Devuelve true si se registro.
-bool insertarPorElFinal(NodoCola*& frente, NodoCola*& final, string usuario, int codigoJuego) {
-    if (usuario.empty() || codigoJuego <= 0) {
-        cout << "Solicitud incompleta\n";
-        return false;
-    }
-
-    Solicitud solicitud;
-    solicitud.usuario = usuario;
-    solicitud.codigoJuego = codigoJuego;
-
+// Auxiliar (sin mensajes): enlaza una solicitud al final de la cola
+void encolar(NodoCola*& frente, NodoCola*& final, Solicitud solicitud) {
     NodoCola* nuevo = new NodoCola(solicitud);
 
-    // Si la cola esta vacia, el nuevo nodo es frente y final a la vez
     if (frente == NULL) {
         frente = nuevo;
         final = nuevo;
@@ -340,12 +360,34 @@ bool insertarPorElFinal(NodoCola*& frente, NodoCola*& final, string usuario, int
         final->siguiente = nuevo;
         final = nuevo;
     }
+}
+
+// Enqueue: inserta por el final. Valida datos y que el juego exista.
+bool insertarPorElFinal(NodoCola*& frente, NodoCola*& final, Nodo* catalogo,
+                        string usuario, int codigoJuego) {
+    if (usuario.empty() || codigoJuego <= 0) {
+        cout << "Solicitud incompleta\n";
+        return false;
+    }
+    if (!textoValido(usuario)) {
+        cout << "No se permite el caracter '|' en los textos\n";
+        return false;
+    }
+    if (buscarPorCodigo(catalogo, codigoJuego) == NULL) {
+        cout << "El videojuego solicitado no existe en el catalogo\n";
+        return false;
+    }
+
+    Solicitud solicitud;
+    solicitud.usuario = usuario;
+    solicitud.codigoJuego = codigoJuego;
+    encolar(frente, final, solicitud);
 
     cout << "Solicitud registrada\n";
     return true;
 }
 
-// Atiende y procesa la solicitud mas antigua (la del frente)
+// Dequeue: procesa la solicitud del frente
 void eliminarPorElFrente(NodoCola*& frente, NodoCola*& final) {
     if (frente == NULL) {
         cout << "La cola esta vacia\n";
@@ -354,47 +396,252 @@ void eliminarPorElFrente(NodoCola*& frente, NodoCola*& final) {
 
     NodoCola* aux = frente;
     Solicitud solicitud = aux->dato;
-
     frente = frente->siguiente;
 
-    // Si ya no quedan solicitudes, final tambien debe quedar en NULL
     if (frente == NULL) {
         final = NULL;
     }
 
     delete aux;
-
     cout << "Solicitud procesada: " << solicitud.usuario
          << " - " << solicitud.codigoJuego << "\n";
 }
 
-// Muestra las solicitudes pendientes, desde la mas antigua
-void consultarSolicitudes(NodoCola* frente) {
+// Muestra las solicitudes pendientes en orden de llegada
+void mostrarSolicitudes(NodoCola* frente) {
     if (frente == NULL) {
-        cout << "La cola esta vacia\n";
+        cout << "\nNo hay solicitudes de compra pendientes.\n";
         return;
     }
-
-    cout << "\n--- SOLICITUDES PENDIENTES ---\n";
-    int posicion = 1;
+    cout << "\n=========== COLA DE SOLICITUDES PENDIENTES ===========\n";
     NodoCola* temp = frente;
-
+    int turno = 1;
     while (temp != NULL) {
-        cout << posicion << ". Usuario: " << temp->dato.usuario
-             << " | Codigo del juego: " << temp->dato.codigoJuego << "\n";
+        cout << "Turno #" << turno++
+             << " | Usuario: " << temp->dato.usuario
+             << " | Codigo de juego: " << temp->dato.codigoJuego << "\n";
         temp = temp->siguiente;
-        posicion++;
+    }
+}
+
+// Cuenta cuantas solicitudes pendientes piden un videojuego
+int contarSolicitudesDe(NodoCola* frente, int codigo) {
+    int cantidad = 0;
+    NodoCola* temp = frente;
+    while (temp != NULL) {
+        if (temp->dato.codigoJuego == codigo) {
+            cantidad++;
+        }
+        temp = temp->siguiente;
+    }
+    return cantidad;
+}
+
+// ==========================================================
+// 6. PERSISTENCIA: GUARDAR Y CARGAR ARCHIVOS DE TEXTO
+//    catalogo.txt    -> codigo|nombre|genero|precio   (una linea por juego)
+//    solicitudes.txt -> usuario|codigo                (del frente al final)
+//    historial.txt   -> texto de la accion            (de la cima a la base)
+// ==========================================================
+
+// Divide una linea en campos separados por '|'.
+// Devuelve la cantidad de campos (maximo+1 si hay mas de los esperados).
+int dividir(const string& linea, string campos[], int maximo) {
+    int cantidad = 0;
+    size_t inicio = 0;
+
+    while (cantidad < maximo) {
+        size_t pos = linea.find(SEPARADOR, inicio);
+        if (pos == string::npos) {
+            campos[cantidad++] = linea.substr(inicio);
+            return cantidad;
+        }
+        campos[cantidad++] = linea.substr(inicio, pos - inicio);
+        inicio = pos + 1;
+    }
+    return maximo + 1;
+}
+
+// ---------- GUARDAR ----------
+
+bool guardarCatalogo(Nodo* inicio) {
+    ofstream archivo(ARCHIVO_CATALOGO);
+    if (!archivo) {
+        return false;
+    }
+    archivo << fixed << setprecision(2);
+    Nodo* temp = inicio;
+    while (temp != NULL) {
+        archivo << temp->dato.codigo << SEPARADOR
+                << temp->dato.nombre << SEPARADOR
+                << temp->dato.genero << SEPARADOR
+                << temp->dato.precio << "\n";
+        temp = temp->siguiente;
+    }
+    return archivo.good();
+}
+
+bool guardarSolicitudes(NodoCola* frente) {
+    ofstream archivo(ARCHIVO_SOLICITUDES);
+    if (!archivo) {
+        return false;
+    }
+    NodoCola* temp = frente;
+    while (temp != NULL) {
+        archivo << temp->dato.usuario << SEPARADOR << temp->dato.codigoJuego << "\n";
+        temp = temp->siguiente;
+    }
+    return archivo.good();
+}
+
+bool guardarHistorial(NodoPila* cima) {
+    ofstream archivo(ARCHIVO_HISTORIAL);
+    if (!archivo) {
+        return false;
+    }
+    NodoPila* temp = cima;
+    while (temp != NULL) {
+        archivo << temp->dato << "\n";
+        temp = temp->siguiente;
+    }
+    return archivo.good();
+}
+
+// Guarda las tres estructuras. Avisa si algun archivo no se pudo escribir.
+void guardarTodo(Nodo* catalogo, NodoCola* frente, NodoPila* historial) {
+    bool ok = guardarCatalogo(catalogo);
+    ok = guardarSolicitudes(frente) && ok;
+    ok = guardarHistorial(historial) && ok;
+    if (!ok) {
+        cout << "ADVERTENCIA: no se pudieron guardar los datos en disco.\n";
+    }
+}
+
+// ---------- CARGAR ----------
+// Si un archivo no existe (primera ejecucion) la estructura queda vacia.
+// Las lineas danadas o inconsistentes se ignoran y se cuentan en 'descartadas'.
+
+int cargarCatalogo(Nodo*& inicio, int& descartadas) {
+    ifstream archivo(ARCHIVO_CATALOGO);
+    if (!archivo) {
+        return 0;
+    }
+
+    int cargados = 0;
+    string linea;
+    while (getline(archivo, linea)) {
+        linea = recortar(linea);
+        if (linea.empty()) {
+            continue;
+        }
+
+        string campos[4];
+        Videojuego juego;
+        bool valido = dividir(linea, campos, 4) == 4
+                      && textoAEntero(campos[0], juego.codigo)
+                      && textoADecimal(campos[3], juego.precio)
+                      && juego.codigo > 0
+                      && juego.precio >= 0
+                      && !campos[1].empty()
+                      && !campos[2].empty()
+                      && buscarPorCodigo(inicio, juego.codigo) == NULL;
+
+        if (valido) {
+            juego.nombre = campos[1];
+            juego.genero = campos[2];
+            agregarAlFinal(inicio, juego);
+            cargados++;
+        } else {
+            descartadas++;
+        }
+    }
+    return cargados;
+}
+
+int cargarSolicitudes(NodoCola*& frente, NodoCola*& final, Nodo* catalogo, int& descartadas) {
+    ifstream archivo(ARCHIVO_SOLICITUDES);
+    if (!archivo) {
+        return 0;
+    }
+
+    int cargadas = 0;
+    string linea;
+    while (getline(archivo, linea)) {
+        linea = recortar(linea);
+        if (linea.empty()) {
+            continue;
+        }
+
+        string campos[2];
+        Solicitud solicitud;
+        bool valida = dividir(linea, campos, 2) == 2
+                      && !campos[0].empty()
+                      && textoAEntero(campos[1], solicitud.codigoJuego)
+                      && solicitud.codigoJuego > 0
+                      && buscarPorCodigo(catalogo, solicitud.codigoJuego) != NULL;
+
+        if (valida) {
+            solicitud.usuario = campos[0];
+            encolar(frente, final, solicitud);
+            cargadas++;
+        } else {
+            descartadas++;
+        }
+    }
+    return cargadas;
+}
+
+// La primera linea del archivo es la cima, por eso se enlaza al final de la pila
+int cargarHistorial(NodoPila*& cima) {
+    ifstream archivo(ARCHIVO_HISTORIAL);
+    if (!archivo) {
+        return 0;
+    }
+
+    int cargadas = 0;
+    NodoPila* ultimo = NULL;
+    string linea;
+    while (getline(archivo, linea)) {
+        linea = recortar(linea);
+        if (linea.empty()) {
+            continue;
+        }
+
+        NodoPila* nuevo = new NodoPila(linea);
+        if (cima == NULL) {
+            cima = nuevo;
+        } else {
+            ultimo->siguiente = nuevo;
+        }
+        ultimo = nuevo;
+        cargadas++;
+    }
+    return cargadas;
+}
+
+// Carga las tres estructuras al iniciar (el catalogo va primero)
+void cargarTodo(Nodo*& catalogo, NodoCola*& frente, NodoCola*& final, NodoPila*& historial) {
+    int descartadas = 0;
+    int juegos = cargarCatalogo(catalogo, descartadas);
+    int solicitudes = cargarSolicitudes(frente, final, catalogo, descartadas);
+    int acciones = cargarHistorial(historial);
+
+    if (juegos + solicitudes + acciones > 0) {
+        cout << "Datos cargados: " << juegos << " videojuego(s), "
+             << solicitudes << " solicitud(es), "
+             << acciones << " accion(es) de historial.\n";
+    }
+    if (descartadas > 0) {
+        cout << "ADVERTENCIA: se ignoraron " << descartadas
+             << " linea(s) invalida(s) en los archivos.\n";
     }
 }
 
 // ==========================================================
-// 6. LIBERACION DE MEMORIA DINAMICA
-//    Se llaman al salir del programa: cada nodo creado con
-//    new se elimina con delete para evitar fugas de memoria.
+// 7. LIBERACION DE MEMORIA (RNF-07)
 // ==========================================================
 
-// Libera todos los nodos del catalogo
-void liberarCatalogo(Nodo*& inicio) {
+void liberarLista(Nodo*& inicio) {
     while (inicio != NULL) {
         Nodo* aux = inicio;
         inicio = inicio->siguiente;
@@ -402,7 +649,6 @@ void liberarCatalogo(Nodo*& inicio) {
     }
 }
 
-// Libera todos los nodos del historial
 void liberarPila(NodoPila*& cima) {
     while (cima != NULL) {
         NodoPila* aux = cima;
@@ -411,7 +657,6 @@ void liberarPila(NodoPila*& cima) {
     }
 }
 
-// Libera todos los nodos de la cola y deja frente y final en NULL
 void liberarCola(NodoCola*& frente, NodoCola*& final) {
     while (frente != NULL) {
         NodoCola* aux = frente;
@@ -422,288 +667,15 @@ void liberarCola(NodoCola*& frente, NodoCola*& final) {
 }
 
 // ==========================================================
-// 7. PERSISTENCIA (ARCHIVOS)
-//    Los datos se guardan en archivos de texto en la carpeta
-//    del ejecutable y se recuperan al iniciar el programa.
-//    Formato de cada archivo:
-//      catalogo.txt    : codigo|nombre|genero|precio
-//      solicitudes.txt : usuario|codigoJuego (frente -> final)
-//      historial.txt   : una accion por linea (cima -> base)
-// ==========================================================
-
-// Nombres de los archivos de texto
-const char* ARCHIVO_CATALOGO = "catalogo.txt";
-const char* ARCHIVO_SOLICITUDES = "solicitudes.txt";
-const char* ARCHIVO_HISTORIAL = "historial.txt";
-
-// Convierte texto a entero sin imprimir nada (para la carga)
-bool convertirEntero(const string& texto, int& valor) {
-    istringstream ss(texto);
-    char extra;
-    return (ss >> valor) && !(ss >> extra);
-}
-
-// Convierte texto a decimal sin imprimir nada (para la carga)
-bool convertirDecimal(const string& texto, float& valor) {
-    istringstream ss(texto);
-    char extra;
-    return (ss >> valor) && !(ss >> extra);
-}
-
-// Separa una linea por el caracter '|'. Devuelve false si hay
-// mas campos de los permitidos. "cantidad" recibe cuantos salieron.
-bool separarCampos(const string& linea, string campos[], int maximo, int& cantidad) {
-    cantidad = 0;
-    size_t inicio = 0;
-
-    size_t pos = linea.find('|');
-    while (pos != string::npos) {
-        if (cantidad == maximo) {
-            return false;
-        }
-        campos[cantidad] = recortar(linea.substr(inicio, pos - inicio));
-        cantidad++;
-        inicio = pos + 1;
-        pos = linea.find('|', inicio);
-    }
-
-    if (cantidad == maximo) {
-        return false;
-    }
-    campos[cantidad] = recortar(linea.substr(inicio));
-    cantidad++;
-    return true;
-}
-
-// Auxiliar de carga: enlaza un juego al final de la lista sin imprimir
-void enlazarVideojuego(Nodo*& inicio, const Videojuego& juego) {
-    Nodo* nuevo = new Nodo(juego);
-    if (inicio == NULL) {
-        inicio = nuevo;
-        return;
-    }
-    Nodo* temp = inicio;
-    while (temp->siguiente != NULL) {
-        temp = temp->siguiente;
-    }
-    temp->siguiente = nuevo;
-}
-
-// Auxiliar de carga: enlaza una solicitud al final de la cola sin imprimir
-void enlazarSolicitud(NodoCola*& frente, NodoCola*& final, const Solicitud& solicitud) {
-    NodoCola* nuevo = new NodoCola(solicitud);
-    if (frente == NULL) {
-        frente = nuevo;
-        final = nuevo;
-        return;
-    }
-    final->siguiente = nuevo;
-    final = nuevo;
-}
-
-// Auxiliar de carga: inserta una accion en la cima sin imprimir
-void enlazarAccion(NodoPila*& cima, const string& accion) {
-    NodoPila* nuevo = new NodoPila(accion);
-    nuevo->siguiente = cima;
-    cima = nuevo;
-}
-
-// Guarda el catalogo, un juego por linea
-void guardarCatalogo(Nodo* inicio) {
-    ofstream archivo(ARCHIVO_CATALOGO);
-    if (!archivo.is_open()) {
-        cout << "No se pudo abrir " << ARCHIVO_CATALOGO << " para guardar\n";
-        return;
-    }
-
-    Nodo* temp = inicio;
-    while (temp != NULL) {
-        archivo << temp->dato.codigo << "|"
-                << temp->dato.nombre << "|"
-                << temp->dato.genero << "|"
-                << fixed << setprecision(2) << temp->dato.precio << "\n";
-        temp = temp->siguiente;
-    }
-}
-
-// Guarda las solicitudes, de frente a final
-void guardarSolicitudes(NodoCola* frente) {
-    ofstream archivo(ARCHIVO_SOLICITUDES);
-    if (!archivo.is_open()) {
-        cout << "No se pudo abrir " << ARCHIVO_SOLICITUDES << " para guardar\n";
-        return;
-    }
-
-    NodoCola* temp = frente;
-    while (temp != NULL) {
-        archivo << temp->dato.usuario << "|" << temp->dato.codigoJuego << "\n";
-        temp = temp->siguiente;
-    }
-}
-
-// Guarda el historial, de cima a base
-void guardarHistorial(NodoPila* cima) {
-    ofstream archivo(ARCHIVO_HISTORIAL);
-    if (!archivo.is_open()) {
-        cout << "No se pudo abrir " << ARCHIVO_HISTORIAL << " para guardar\n";
-        return;
-    }
-
-    NodoPila* temp = cima;
-    while (temp != NULL) {
-        archivo << temp->dato << "\n";
-        temp = temp->siguiente;
-    }
-}
-
-// Carga el catalogo al final de la lista. Ignora lineas invalidas
-// y codigos repetidos.
-void cargarCatalogo(Nodo*& inicio, int& cantidadCargada) {
-    cantidadCargada = 0;
-    ifstream archivo(ARCHIVO_CATALOGO);
-    if (!archivo.is_open()) {
-        return;  // Primera ejecucion: el archivo no existe
-    }
-
-    string linea;
-    string campos[4];
-    int cantidad = 0;
-
-    while (getline(archivo, linea)) {
-        linea = recortar(linea);
-        if (linea.empty()) {
-            continue;
-        }
-
-        int codigo;
-        float precio;
-        if (!separarCampos(linea, campos, 4, cantidad) || cantidad != 4) {
-            continue;
-        }
-        if (!convertirEntero(campos[0], codigo) || codigo <= 0) {
-            continue;
-        }
-        if (campos[1].empty() || campos[2].empty()) {
-            continue;
-        }
-        if (!convertirDecimal(campos[3], precio) || precio < 0) {
-            continue;
-        }
-        if (buscarPorCodigo(inicio, codigo) != NULL) {
-            continue;  // Codigo repetido: se ignora
-        }
-
-        Videojuego juego;
-        juego.codigo = codigo;
-        juego.nombre = campos[1];
-        juego.genero = campos[2];
-        juego.precio = precio;
-        enlazarVideojuego(inicio, juego);
-        cantidadCargada++;
-    }
-}
-
-// Carga las solicitudes en el mismo orden del archivo (frente -> final)
-void cargarSolicitudes(NodoCola*& frente, NodoCola*& final, int& cantidadCargada) {
-    cantidadCargada = 0;
-    ifstream archivo(ARCHIVO_SOLICITUDES);
-    if (!archivo.is_open()) {
-        return;
-    }
-
-    string linea;
-    string campos[2];
-    int cantidad = 0;
-
-    while (getline(archivo, linea)) {
-        linea = recortar(linea);
-        if (linea.empty()) {
-            continue;
-        }
-
-        int codigoJuego;
-        if (!separarCampos(linea, campos, 2, cantidad) || cantidad != 2) {
-            continue;
-        }
-        if (campos[0].empty()) {
-            continue;
-        }
-        if (!convertirEntero(campos[1], codigoJuego) || codigoJuego <= 0) {
-            continue;
-        }
-
-        Solicitud solicitud;
-        solicitud.usuario = campos[0];
-        solicitud.codigoJuego = codigoJuego;
-        enlazarSolicitud(frente, final, solicitud);
-        cantidadCargada++;
-    }
-}
-
-// Carga el historial. El archivo va de cima a base, por eso se
-// apila primero en una pila auxiliar y despues se traslada a la
-// pila real: la primera linea del archivo queda en la cima.
-void cargarHistorial(NodoPila*& cima, int& cantidadCargada) {
-    cantidadCargada = 0;
-    ifstream archivo(ARCHIVO_HISTORIAL);
-    if (!archivo.is_open()) {
-        return;
-    }
-
-    NodoPila* auxiliar = NULL;
-    string linea;
-
-    while (getline(archivo, linea)) {
-        linea = recortar(linea);
-        if (linea.empty()) {
-            continue;
-        }
-        enlazarAccion(auxiliar, linea);
-        cantidadCargada++;
-    }
-
-    // En la auxiliar la accion mas antigua quedo en la cima.
-    // Al pasarla a la pila real, la mas reciente queda arriba.
-    while (auxiliar != NULL) {
-        NodoPila* nodo = auxiliar;
-        auxiliar = auxiliar->siguiente;
-        nodo->siguiente = cima;
-        cima = nodo;
-    }
-}
-
-// Agrupadora: guarda las tres estructuras
-void guardarDatos(Nodo* inicio, NodoCola* frente, NodoPila* cima) {
-    guardarCatalogo(inicio);
-    guardarSolicitudes(frente);
-    guardarHistorial(cima);
-}
-
-// Agrupadora: carga las tres estructuras y muestra un solo resumen
-void cargarDatos(Nodo*& inicio, NodoCola*& frente, NodoCola*& final, NodoPila*& cima) {
-    int juegos = 0;
-    int solicitudes = 0;
-    int acciones = 0;
-
-    cargarCatalogo(inicio, juegos);
-    cargarSolicitudes(frente, final, solicitudes);
-    cargarHistorial(cima, acciones);
-
-    cout << "\nDatos cargados: " << juegos << " juegos, "
-         << solicitudes << " solicitudes, " << acciones << " acciones\n";
-}
-
-// ==========================================================
 // 8. OPCIONES DEL MENU
-//    Cada opcion pide los datos, llama a las funciones de las
-//    partes anteriores y registra la accion en el historial.
+//    Leen los datos, llaman a la operacion y, si salio bien,
+//    registran la accion en el historial (pila).
 // ==========================================================
 
-// ---------- Opciones del catalogo ----------
-
-void opcionRegistrarVideojuego(Nodo*& inicio, NodoPila*& cima) {
-    int codigo;
-    float precio;
+void opcionRegistrar(Nodo*& catalogo, NodoPila*& historial) {
+    cout << "\n--- REGISTRAR NUEVO VIDEOJUEGO ---\n";
+    int codigo = 0;
+    float precio = 0;
 
     if (!leerEntero("Codigo: ", codigo)) {
         cout << "Codigo invalido\n";
@@ -716,209 +688,151 @@ void opcionRegistrarVideojuego(Nodo*& inicio, NodoPila*& cima) {
         return;
     }
 
-    if (insertarVideojuego(inicio, codigo, nombre, genero, precio)) {
-        insertarEnCima(cima, "Registro del videojuego " + aTexto(codigo) + " (" + nombre + ")");
+    if (insertarVideojuego(catalogo, codigo, nombre, genero, precio)) {
+        insertarEnCima(historial, "Registro de juego: " + nombre + " (ID: " + aTexto(codigo) + ")");
     }
 }
 
-void opcionBuscarVideojuego(Nodo* inicio) {
-    cout << "Buscar por:\n";
-    cout << "1. Codigo\n";
-    cout << "2. Nombre\n";
+void opcionBuscar(Nodo* catalogo) {
+    cout << "\n--- BUSCAR VIDEOJUEGO ---\n";
+    cout << "1. Buscar por codigo\n";
+    cout << "2. Buscar por nombre\n";
 
-    int opcion;
+    int opcion = 0;
     if (!leerEntero("Seleccione una opcion: ", opcion)) {
-        cout << "Opcion invalida\n";
+        cout << "Opcion invalida.\n";
         return;
     }
 
     if (opcion == 1) {
-        int codigo;
-        if (!leerEntero("Codigo a buscar: ", codigo)) {
+        int codigo = 0;
+        if (!leerEntero("Ingrese el codigo a buscar: ", codigo)) {
             cout << "Codigo invalido\n";
             return;
         }
-        buscarVideojuego(inicio, "codigo", aTexto(codigo));
+        buscarVideojuego(catalogo, "codigo", aTexto(codigo));
     } else if (opcion == 2) {
-        string nombre = leerLinea("Nombre a buscar: ");
-        buscarVideojuego(inicio, "nombre", nombre);
+        string nombre = leerLinea("Ingrese el nombre a buscar: ");
+        buscarVideojuego(catalogo, "nombre", nombre);
     } else {
-        cout << "Opcion invalida\n";
+        cout << "Opcion invalida.\n";
     }
 }
 
-void opcionActualizarVideojuego(Nodo* inicio, NodoPila*& cima) {
-    int codigo;
-    if (!leerEntero("Codigo del videojuego a actualizar: ", codigo)) {
+void opcionActualizar(Nodo* catalogo, NodoPila*& historial) {
+    cout << "\n--- ACTUALIZAR VIDEOJUEGO ---\n";
+    int codigo = 0;
+    if (!leerEntero("Codigo del videojuego a modificar: ", codigo)) {
         cout << "Codigo invalido\n";
         return;
     }
-    if (actualizarVideojuego(inicio, codigo)) {
-        insertarEnCima(cima, "Actualizacion del videojuego " + aTexto(codigo));
+    if (actualizarVideojuego(catalogo, codigo)) {
+        insertarEnCima(historial, "Actualizacion de juego ID: " + aTexto(codigo));
     }
 }
 
-void opcionEliminarVideojuego(Nodo*& inicio, NodoPila*& cima) {
-    int codigo;
-    if (!leerEntero("Codigo del videojuego a eliminar: ", codigo)) {
+void opcionEliminar(Nodo*& catalogo, NodoCola* frente, NodoPila*& historial) {
+    cout << "\n--- ELIMINAR VIDEOJUEGO ---\n";
+    int codigo = 0;
+    if (!leerEntero("Codigo a eliminar: ", codigo)) {
         cout << "Codigo invalido\n";
         return;
     }
-    if (eliminarVideojuego(inicio, codigo)) {
-        insertarEnCima(cima, "Eliminacion del videojuego " + aTexto(codigo));
+
+    // Integridad: no se elimina un juego que tiene solicitudes pendientes
+    int pendientes = contarSolicitudesDe(frente, codigo);
+    if (pendientes > 0) {
+        cout << "No se puede eliminar: hay " << pendientes
+             << " solicitud(es) pendiente(s) para este videojuego\n";
+        return;
+    }
+
+    // Se guarda el nombre antes de borrar el nodo, para el historial
+    string nombre = "";
+    Nodo* existente = buscarPorCodigo(catalogo, codigo);
+    if (existente != NULL) {
+        nombre = existente->dato.nombre;
+    }
+
+    if (eliminarVideojuego(catalogo, codigo)) {
+        insertarEnCima(historial, "Eliminacion de juego: " + nombre + " (ID: " + aTexto(codigo) + ")");
     }
 }
 
-// ---------- Opciones de solicitudes de compra ----------
-
-void opcionRegistrarSolicitud(Nodo* catalogo, NodoCola*& frente, NodoCola*& final, NodoPila*& cima) {
+void opcionSolicitud(NodoCola*& frente, NodoCola*& final, Nodo* catalogo) {
+    cout << "\n--- REGISTRAR SOLICITUD DE COMPRA ---\n";
     string usuario = leerLinea("Nombre del usuario: ");
-    int codigoJuego;
-
-    if (!leerEntero("Codigo del juego a comprar: ", codigoJuego)) {
-        cout << "Codigo invalido\n";
-        return;
+    int codigo = 0;
+    if (!leerEntero("Codigo del videojuego solicitado: ", codigo)) {
+        codigo = 0;   // la funcion lo rechaza como "Solicitud incompleta"
     }
-    if (buscarPorCodigo(catalogo, codigoJuego) == NULL) {
-        cout << "El videojuego no existe en el catalogo\n";
-        return;
-    }
-
-    if (insertarPorElFinal(frente, final, usuario, codigoJuego)) {
-        insertarEnCima(cima, "Solicitud registrada: " + usuario + " - juego " + aTexto(codigoJuego));
-    }
-}
-
-void opcionProcesarSolicitud(NodoCola*& frente, NodoCola*& final, NodoPila*& cima) {
-    if (frente == NULL) {
-        cout << "La cola esta vacia\n";
-        return;
-    }
-
-    // Se guardan los datos antes de que el nodo sea eliminado
-    string usuario = frente->dato.usuario;
-    int codigoJuego = frente->dato.codigoJuego;
-
-    eliminarPorElFrente(frente, final);
-    insertarEnCima(cima, "Solicitud procesada: " + usuario + " - juego " + aTexto(codigoJuego));
-}
-
-// ---------- Submenus ----------
-
-void menuCatalogo(Nodo*& catalogo, NodoPila*& historial) {
-    int opcion;
-    do {
-        cout << "\n----- CATALOGO DE VIDEOJUEGOS -----\n";
-        cout << "1. Registrar videojuego\n";
-        cout << "2. Mostrar catalogo\n";
-        cout << "3. Buscar videojuego\n";
-        cout << "4. Actualizar videojuego\n";
-        cout << "5. Eliminar videojuego\n";
-        cout << "0. Volver al menu principal\n";
-
-        if (!leerEntero("Seleccione una opcion: ", opcion)) {
-            opcion = -1;
-        }
-
-        switch (opcion) {
-            case 1: opcionRegistrarVideojuego(catalogo, historial); break;
-            case 2: mostrarVideojuegos(catalogo); break;
-            case 3: opcionBuscarVideojuego(catalogo); break;
-            case 4: opcionActualizarVideojuego(catalogo, historial); break;
-            case 5: opcionEliminarVideojuego(catalogo, historial); break;
-            case 0: break;
-            default: cout << "Opcion invalida\n";
-        }
-    } while (opcion != 0);
-}
-
-void menuSolicitudes(Nodo* catalogo, NodoCola*& frente, NodoCola*& final, NodoPila*& historial) {
-    int opcion;
-    do {
-        cout << "\n----- SOLICITUDES DE COMPRA -----\n";
-        cout << "1. Registrar solicitud\n";
-        cout << "2. Procesar siguiente solicitud\n";
-        cout << "3. Consultar solicitudes pendientes\n";
-        cout << "0. Volver al menu principal\n";
-
-        if (!leerEntero("Seleccione una opcion: ", opcion)) {
-            opcion = -1;
-        }
-
-        switch (opcion) {
-            case 1: opcionRegistrarSolicitud(catalogo, frente, final, historial); break;
-            case 2: opcionProcesarSolicitud(frente, final, historial); break;
-            case 3: consultarSolicitudes(frente); break;
-            case 0: break;
-            default: cout << "Opcion invalida\n";
-        }
-    } while (opcion != 0);
-}
-
-void menuHistorial(NodoPila*& historial) {
-    int opcion;
-    do {
-        cout << "\n----- HISTORIAL DE ACCIONES -----\n";
-        cout << "1. Mostrar historial\n";
-        cout << "2. Retirar la ultima accion\n";
-        cout << "0. Volver al menu principal\n";
-
-        if (!leerEntero("Seleccione una opcion: ", opcion)) {
-            opcion = -1;
-        }
-
-        switch (opcion) {
-            case 1: mostrarHistorial(historial); break;
-            case 2: eliminarDeCima(historial); break;
-            case 0: break;
-            default: cout << "Opcion invalida\n";
-        }
-    } while (opcion != 0);
+    insertarPorElFinal(frente, final, catalogo, usuario, codigo);
 }
 
 // ==========================================================
-// 9. FUNCION PRINCIPAL
+// 9. PROGRAMA PRINCIPAL
 // ==========================================================
 
 int main() {
-    Nodo* catalogo = NULL;       // Lista enlazada
-    NodoCola* frente = NULL;     // Cola: frente
-    NodoCola* final = NULL;      // Cola: final
-    NodoPila* historial = NULL;  // Pila: cima
+    Nodo* catalogo = NULL;          // Lista enlazada
+    NodoPila* historial = NULL;     // Pila (cima)
+    NodoCola* frenteCola = NULL;    // Cola (frente)
+    NodoCola* finalCola = NULL;     // Cola (final)
 
-    // Recuperar los datos guardados en la ejecucion anterior
-    cargarDatos(catalogo, frente, final, historial);
+    // Recupera los datos guardados en la ejecucion anterior
+    cargarTodo(catalogo, frenteCola, finalCola, historial);
 
-    int opcion;
+    int opcion = -1;
+
     do {
-        cout << "\n==========================================\n";
-        cout << "   TIENDA DIGITAL DE VIDEOJUEGOS\n";
-        cout << "==========================================\n";
-        cout << "1. Catalogo de videojuegos\n";
-        cout << "2. Solicitudes de compra\n";
-        cout << "3. Historial de acciones\n";
+        cout << "\n=======================================================\n";
+        cout << "  SISTEMA DE GESTION DE TIENDA DIGITAL DE VIDEOJUEGOS  \n";
+        cout << "=======================================================\n";
+        cout << "1. Registrar Videojuego (Lista)\n";
+        cout << "2. Mostrar Catalogo (Lista)\n";
+        cout << "3. Buscar Videojuego (Lista)\n";
+        cout << "4. Actualizar Videojuego (Lista)\n";
+        cout << "5. Eliminar Videojuego (Lista)\n";
+        cout << "-------------------------------------------------------\n";
+        cout << "6. Registrar Solicitud de Compra (Cola - Enqueue)\n";
+        cout << "7. Procesar Solicitud de Compra (Cola - Dequeue)\n";
+        cout << "8. Consultar Solicitudes Pendientes (Cola)\n";
+        cout << "-------------------------------------------------------\n";
+        cout << "9. Ver Historial de Acciones (Pila)\n";
+        cout << "10. Retirar Ultima Accion del Historial (Pila - Pop)\n";
         cout << "0. Salir\n";
+        cout << "=======================================================\n";
 
-        if (!leerEntero("Seleccione una opcion: ", opcion)) {
-            opcion = -1;
+        if (!leerEntero("Ingrese una opcion: ", opcion)) {
+            opcion = -1;   // texto no numerico -> cae en "opcion invalida"
         }
 
         switch (opcion) {
-            case 1: menuCatalogo(catalogo, historial); break;
-            case 2: menuSolicitudes(catalogo, frente, final, historial); break;
-            case 3: menuHistorial(historial); break;
-            case 0: cout << "\nSaliendo del sistema...\n"; break;
-            default: cout << "Opcion invalida\n";
+            case 1:  opcionRegistrar(catalogo, historial); break;
+            case 2:  mostrarVideojuegos(catalogo); break;
+            case 3:  opcionBuscar(catalogo); break;
+            case 4:  opcionActualizar(catalogo, historial); break;
+            case 5:  opcionEliminar(catalogo, frenteCola, historial); break;
+            case 6:  opcionSolicitud(frenteCola, finalCola, catalogo); break;
+            case 7:  eliminarPorElFrente(frenteCola, finalCola); break;
+            case 8:  mostrarSolicitudes(frenteCola); break;
+            case 9:  mostrarHistorial(historial); break;
+            case 10: eliminarDeCima(historial); break;
+            case 0:  cout << "\nSaliendo del sistema... Hasta luego!\n"; break;
+            default: cout << "\nOpcion invalida. Intente de nuevo.\n";
         }
 
-        // Guardar en disco al final de cada vuelta del menu
-        guardarDatos(catalogo, frente, historial);
+        // Persistencia: despues de toda opcion que puede modificar datos
+        if (opcion == 1 || opcion == 4 || opcion == 5 ||
+            opcion == 6 || opcion == 7 || opcion == 10) {
+            guardarTodo(catalogo, frenteCola, historial);
+        }
     } while (opcion != 0);
 
-    // Liberar toda la memoria dinamica antes de terminar
-    liberarCatalogo(catalogo);
-    liberarCola(frente, final);
+    // Se libera toda la memoria dinamica antes de terminar
+    liberarLista(catalogo);
     liberarPila(historial);
+    liberarCola(frenteCola, finalCola);
 
     return 0;
 }
